@@ -11,7 +11,7 @@
   ],
   "host_permissions": [
     "https://api.anthropic.com/*",
-    "http://100.*.*.*/*",
+    "http://100.64.0.2:8765/*",
     "https://*.linkedin.com/*",
     "https://hh.ru/*",
     "https://career.habr.com/*",
