@@ -52,15 +52,25 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       const result = await analyzeJob(info.selectionText, info.pageUrl || '', settings);
       await chrome.storage.local.set({ lastAnalysis: result });
-      chrome.action.openPopup();
+      await openPopupSafe();
     } catch (error) {
       await chrome.storage.local.set({
         lastAnalysis: { error: error instanceof Error ? error.message : 'Unknown error' },
       });
-      chrome.action.openPopup();
+      await openPopupSafe();
     }
   }
 });
+
+async function openPopupSafe() {
+  try {
+    const win = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
+    await chrome.action.openPopup({ windowId: win.id! });
+  } catch {
+    await chrome.action.setBadgeText({ text: '!' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#6366f1' });
+  }
+}
 
 async function fetchCareerContext(mcpUrl: string): Promise<string> {
   const response = await fetch(`${mcpUrl}/context`);
