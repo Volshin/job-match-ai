@@ -1,10 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-// System prompt для анализа вакансий
 const SYSTEM_PROMPT = `Ты эксперт по подбору SAP/Enterprise-вакансий для DACH-рынка.
 
 На входе:
-1. Карьерный профиль кандидата (через MCP tools)
+1. Карьерный профиль кандидата (ниже в секции CAREER CONTEXT)
 2. Текст вакансии
 
 Проанализируй match и верни строго JSON без префикса/суффикса:
@@ -31,11 +30,8 @@ const SYSTEM_PROMPT = `Ты эксперт по подбору SAP/Enterprise-в
 - Series A-B stage, scaleup, greenfield
 - English-speaking team
 - Project autonomy, strategic role
-- SAP + AI integration
+- SAP + AI integration`;
 
-Учитывай текущие constraints из MCP tools (location preferences, language level, health considerations).`;
-
-// Context menu handler
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'analyze-job',
@@ -47,61 +43,36 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'analyze-job' && info.selectionText) {
     try {
-      // Get settings
       const settings = await chrome.storage.local.get(['apiKey', 'mcpUrl']);
-      
       if (!settings.apiKey) {
         chrome.action.openPopup();
         return;
       }
-
-      // Analyze job
       const result = await analyzeJob(info.selectionText, settings);
-      
-      // Store result
       await chrome.storage.local.set({ lastAnalysis: result });
-      
-      // Open popup to show results
       chrome.action.openPopup();
     } catch (error) {
-      console.error('Analysis failed:', error);
       await chrome.storage.local.set({
-        lastAnalysis: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        },
+        lastAnalysis: { error: error instanceof Error ? error.message : 'Unknown error' },
       });
       chrome.action.openPopup();
     }
   }
 });
 
+async function fetchCareerContext(mcpUrl: string): Promise<string> {
+  const response = await fetch(`${mcpUrl}/context`);
+  if (!response.ok) throw new Error(`Career server error: ${response.status}`);
+  const data = await response.json();
+  return JSON.stringify(data, null, 2);
+}
+
 async function analyzeJob(jobText: string, settings: { apiKey: string; mcpUrl?: string }) {
-  const client = new Anthropic({
-    apiKey: settings.apiKey,
-    dangerouslyAllowBrowser: true,
-  });
+  let systemPrompt = SYSTEM_PROMPT;
 
-  const requestBody: any = {
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `JOB DESCRIPTION:\n\n${jobText}\n\nПроанализируй match с учётом профиля кандидата.`,
-      },
-    ],
-  };
-
-  // Add MCP server if configured
   if (settings.mcpUrl) {
-    requestBody.mcp_servers = [
-      {
-        type: 'url',
-        url: settings.mcpUrl,
-        name: 'career-context',
-      },
-    ];
+    const context = await fetchCareerContext(settings.mcpUrl);
+    systemPrompt += `\n\n## CAREER CONTEXT:\n\`\`\`json\n${context}\n\`\`\`\n\nИспользуй этот контекст при оценке match — особенно priorities.red_flags, priorities.deal_breakers и priorities.health_constraints.`;
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -112,7 +83,17 @@ async function analyzeJob(jobText: string, settings: { apiKey: string; mcpUrl?: 
       'anthropic-dangerous-direct-browser-access': 'true',
       'content-type': 'application/json',
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: `JOB DESCRIPTION:\n\n${jobText}\n\nПроанализируй match с учётом профиля кандидата.`,
+        },
+      ],
+    }),
   });
 
   if (!response.ok) {
@@ -122,25 +103,18 @@ async function analyzeJob(jobText: string, settings: { apiKey: string; mcpUrl?: 
 
   const data = await response.json();
   const textContent = data.content.find((c: any) => c.type === 'text')?.text || '';
-  
-  // Parse JSON response
   const jsonMatch = textContent.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Failed to parse JSON response from Claude');
-  }
-
+  if (!jsonMatch) throw new Error('Failed to parse JSON response from Claude');
   return JSON.parse(jsonMatch[0]);
 }
 
-// Message handler for popup/options communication
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'getLastAnalysis') {
     chrome.storage.local.get(['lastAnalysis']).then((result) => {
       sendResponse(result.lastAnalysis || null);
     });
-    return true; // Async response
+    return true;
   }
-  
   if (message.type === 'clearAnalysis') {
     chrome.storage.local.remove(['lastAnalysis']).then(() => {
       sendResponse({ success: true });

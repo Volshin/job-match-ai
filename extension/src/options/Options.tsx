@@ -28,14 +28,16 @@ function Options() {
     }
 
     try {
-      const response = await fetch(mcpUrl, { method: 'HEAD' });
+      const response = await fetch(`${mcpUrl}/context`);
       if (response.ok) {
-        alert('✅ MCP сервер доступен');
+        const data = await response.json();
+        const hasProfile = !!data.profile;
+        alert(hasProfile ? '✅ Сервер доступен, профиль загружен' : '⚠️ Сервер доступен, но profile.json не найден');
       } else {
-        alert('⚠️ MCP сервер вернул ошибку: ' + response.status);
+        alert('⚠️ Сервер вернул ошибку: ' + response.status);
       }
     } catch (error) {
-      alert('❌ Не удалось подключиться к MCP серверу:\n' + (error as Error).message);
+      alert('❌ Не удалось подключиться к серверу:\n' + (error as Error).message);
     }
   };
 
@@ -78,7 +80,7 @@ function Options() {
               type="url"
               value={mcpUrl}
               onChange={(e) => setMcpUrl(e.target.value)}
-              placeholder="https://mcp.yourdomain.com"
+              placeholder="http://100.x.x.x:8765"
             />
             <p className="help-text">
               URL MCP сервера с карьерным профилем на Raspberry Pi. Оставьте пустым для работы без MCP (используется
