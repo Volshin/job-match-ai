@@ -1,0 +1,15 @@
+[Unit]
+Description=Career MCP Server for Job Match AI
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/projects/job-match-ai-mcp
+Environment="PATH=/home/pi/projects/job-match-ai-mcp/venv/bin"
+ExecStart=/home/pi/projects/job-match-ai-mcp/venv/bin/python career_mcp.py
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

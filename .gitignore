@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+extension/node_modules/
+
+# Build output
+dist/
+extension/dist/
+build/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Personal MCP data (use *.example.json as templates)
+mcp-server/data/profile.json
+mcp-server/data/priorities.json
+mcp-server/data/blacklist.json
+
+# Archives
+*.tar.gz
+*.zip
+
+# Root lockfile (no root dependencies)
+/package-lock.json

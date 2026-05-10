@@ -1,0 +1,63 @@
+{
+  "professional_background": {
+    "summary": "15+ years in enterprise software, architecture and project leadership",
+    "roles": [
+      "Former Head of IT Department",
+      "Former Head of PMO",
+      "Solution Architect"
+    ],
+    "current_focus": "AI integration in enterprise systems"
+  },
+  "skills": {
+    "domain": [
+      "Enterprise ERP (deep expertise)",
+      "Core module A",
+      "Core module B",
+      "Adjacent module (learning)"
+    ],
+    "technical": [
+      "Python",
+      "LangChain",
+      "MCP (Model Context Protocol)",
+      "Docker",
+      "Git"
+    ],
+    "management": [
+      "PMO setup and operations",
+      "Competence Centre leadership",
+      "Cross-functional team coordination",
+      "Vendor management"
+    ]
+  },
+  "target_roles": [
+    "Project Manager",
+    "Application Manager",
+    "Solution Architect (with AI angle)",
+    "Technical Lead + AI integration"
+  ],
+  "location": {
+    "current": "City, Country",
+    "preference": "Target region",
+    "remote_readiness": "Flexible, can relocate"
+  },
+  "languages": {
+    "primary": "Native",
+    "secondary": "C1 (full professional proficiency)",
+    "local": "A2 (basic)"
+  },
+  "certifications_in_progress": [
+    "Relevant certification (studying)"
+  ],
+  "company_stage_preference": [
+    "Series A-B",
+    "Scaleups",
+    "Greenfield projects",
+    "Companies with AI/modernization focus"
+  ],
+  "unique_value_proposition": [
+    "Deep domain expertise + modern AI tooling",
+    "Can bridge legacy systems and AI agents",
+    "Proven track record in complex projects",
+    "Strategic thinking beyond pure technical implementation"
+  ]
+}

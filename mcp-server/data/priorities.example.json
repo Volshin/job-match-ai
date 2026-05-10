@@ -1,0 +1,52 @@
+{
+  "status": "active_search",
+  "updated": "2026-01-01",
+  "location": {
+    "current": "City, Country",
+    "remote_preference": "preferred",
+    "relocation_ready": true,
+    "relocation_timeline_days": 30,
+    "target_cities": ["City A", "City B", "or remote"]
+  },
+  "languages": {
+    "primary": "Native",
+    "secondary": "C1 (full professional)",
+    "local": "A2 (basic)"
+  },
+  "health_constraints": {
+    "active_protocol": false,
+    "details": "",
+    "impact": ""
+  },
+  "availability": {
+    "start_date": "Immediate or 4 weeks notice",
+    "contract_type": ["full-time", "contract", "freelance"],
+    "not_ready_for": ["part-time", "internship"]
+  },
+  "red_flags": [
+    "On-site only with no remote option",
+    "Local language fluency required (not yet ready)",
+    "Junior tasks disguised as senior role",
+    "Mass recruiter without personalisation",
+    "Pure maintenance role without strategic component"
+  ],
+  "green_flags": [
+    "Remote/hybrid work",
+    "AI/modernization focus",
+    "Series A-B stage, scaleup, greenfield",
+    "English-speaking team",
+    "Strategic/architectural role",
+    "Project autonomy"
+  ],
+  "deal_breakers": [
+    "Roles requiring local language fluency (not ready yet)",
+    "100% on-site without flexibility",
+    "Roles pitched as senior but task list is junior"
+  ],
+  "special_preferences": {
+    "avoid_mass_recruiters": true,
+    "prefer_direct_hiring": true,
+    "prefer_companies_with_ai_angle": true,
+    "avoid_pure_bodyshop": true
+  }
+}
