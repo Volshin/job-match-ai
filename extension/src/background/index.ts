@@ -3,14 +3,16 @@ import Anthropic from '@anthropic-ai/sdk';
 const SYSTEM_PROMPT = `Ты эксперт по подбору SAP/Enterprise-вакансий для DACH-рынка.
 
 На входе:
-1. Карьерный профиль кандидата (ниже в секции CAREER CONTEXT)
+1. Карьерный профиль кандидата (в секции CAREER CONTEXT)
 2. Текст вакансии
 
 Проанализируй match и верни строго JSON без префикса/суффикса:
 {
+  "company": "название компании из вакансии или Unknown",
+  "position": "название должности из вакансии",
   "match_score": 0-100,
   "key_matches": ["пункт 1", "пункт 2", ...],
-  "gaps": ["что не хватает 1", "что не хватает 2", ...],
+  "gaps": ["что не хватает 1", ...],
   "red_flags": ["негативный фактор 1", ...],
   "green_flags": ["позитивный фактор 1", ...],
   "recommendation": "Apply" | "Skip" | "Consider",
@@ -48,7 +50,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         chrome.action.openPopup();
         return;
       }
-      const result = await analyzeJob(info.selectionText, settings);
+      const result = await analyzeJob(info.selectionText, info.pageUrl || '', settings);
       await chrome.storage.local.set({ lastAnalysis: result });
       chrome.action.openPopup();
     } catch (error) {
@@ -67,12 +69,33 @@ async function fetchCareerContext(mcpUrl: string): Promise<string> {
   return JSON.stringify(data, null, 2);
 }
 
-async function analyzeJob(jobText: string, settings: { apiKey: string; mcpUrl?: string }) {
+async function saveToTracker(mcpUrl: string, result: any, jobUrl: string) {
+  try {
+    await fetch(`${mcpUrl}/analysis`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        job_url: jobUrl,
+        company: result.company || 'Unknown',
+        position: result.position || 'Unknown',
+        match_score: result.match_score,
+        recommendation: result.recommendation,
+        reasoning: result.reasoning_ru,
+        red_flags: result.red_flags || [],
+        green_flags: result.green_flags || [],
+      }),
+    });
+  } catch {
+    // tracker save is non-critical, silently ignore
+  }
+}
+
+async function analyzeJob(jobText: string, jobUrl: string, settings: { apiKey: string; mcpUrl?: string }) {
   let systemPrompt = SYSTEM_PROMPT;
 
   if (settings.mcpUrl) {
     const context = await fetchCareerContext(settings.mcpUrl);
-    systemPrompt += `\n\n## CAREER CONTEXT:\n\`\`\`json\n${context}\n\`\`\`\n\nИспользуй этот контекст при оценке match — особенно priorities.red_flags, priorities.deal_breakers и priorities.health_constraints.`;
+    systemPrompt += `\n\n## CAREER CONTEXT:\n\`\`\`json\n${context}\n\`\`\`\n\nИспользуй этот контекст — особенно priorities.red_flags, priorities.deal_breakers, priorities.salary.`;
   }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -105,7 +128,14 @@ async function analyzeJob(jobText: string, settings: { apiKey: string; mcpUrl?: 
   const textContent = data.content.find((c: any) => c.type === 'text')?.text || '';
   const jsonMatch = textContent.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Failed to parse JSON response from Claude');
-  return JSON.parse(jsonMatch[0]);
+
+  const result = JSON.parse(jsonMatch[0]);
+
+  if (settings.mcpUrl) {
+    await saveToTracker(settings.mcpUrl, result, jobUrl);
+  }
+
+  return result;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
