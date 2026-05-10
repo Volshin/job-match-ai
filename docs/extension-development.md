@@ -93,8 +93,8 @@ Right-click на странице настроек → "Inspect"
 ### С MCP server
 
 1. Убедись что MCP server запущен на Pi (см. `mcp-deployment.md`)
-2. Убедись что Cloudflare Tunnel работает (см. `cloudflare-tunnel-setup.md`)
-3. Проверь MCP URL в настройках: `https://mcp.yourdomain.com`
+2. Убедись что устройство в Tailscale сети
+3. Проверь MCP URL в настройках: `http://<tailscale-ip>:8765`
 4. "Проверить подключение" в настройках должен дать ✅
 
 Когда запрос идёт с MCP, в DevTools (Background SW) увидишь:
@@ -193,8 +193,8 @@ CORS ошибка. Убедись что:
 ### MCP server не отвечает
 
 1. Проверь что MCP service запущен на Pi: `sudo systemctl status career-mcp`
-2. Проверь Cloudflare tunnel: `sudo systemctl status cloudflared`
-3. Curl тест: `curl https://mcp.yourdomain.com`
+2. Убедись что оба устройства в Tailscale сети: `tailscale status`
+3. Curl тест: `curl http://<tailscale-ip>:8765`
 
 ### Extension не появляется после Load Unpacked
 

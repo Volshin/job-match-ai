@@ -53,7 +53,7 @@ Chrome extension для анализа вакансий на match с карье
   - `save_analysis()` — сохранение результатов анализа (application tracker)
 
 ### 3. Deployment (`/docs`)
-- Cloudflare Tunnel setup на Pi
+- Tailscale setup на Pi
 - Systemd service для MCP server
 - Testing guides
 
@@ -76,11 +76,11 @@ pip install -r requirements.txt
 python career_mcp.py
 ```
 
-### Cloudflare Tunnel
+### Tailscale
 ```bash
-# См. docs/cloudflare-tunnel-setup.md
-cloudflared tunnel create mcp-job-match
-cloudflared tunnel route dns mcp-job-match mcp.yourdomain.com
+# Узнай IP малины
+tailscale ip -4
+# Укажи в настройках расширения: http://<tailscale-ip>:8765
 ```
 
 ## MVP Features (v0.1)
@@ -104,7 +104,7 @@ cloudflared tunnel route dns mcp-job-match mcp.yourdomain.com
 - **Frontend**: TypeScript, React, Vite, Manifest v3
 - **Backend**: Python 3.11+, FastMCP
 - **API**: Anthropic Claude Sonnet 4.6
-- **Tunnel**: Cloudflare Tunnel (free tier)
+- **Network**: Tailscale
 - **Storage**: Chrome Storage API (local + sync)
 
 ## Структура проекта
@@ -131,7 +131,6 @@ job-match-ai/
 │   └── systemd/
 │       └── career-mcp.service
 └── docs/
-    ├── cloudflare-tunnel-setup.md
     ├── mcp-deployment.md
     └── extension-development.md
 ```

@@ -167,17 +167,23 @@ curl -X POST http://localhost:8765 \
 
 ---
 
-## Шаг 8: Интеграция с Cloudflare Tunnel
+## Шаг 8: Доступ через Tailscale
 
-Теперь MCP server запущен на `:8765`. Следуй `cloudflare-tunnel-setup.md` чтобы пробросить его на публичный HTTPS адрес.
+MCP server запущен на `:8765`. Доступ с других устройств — через Tailscale IP.
 
-После настройки tunnel, проверь:
+Узнай Tailscale IP малины:
 
 ```bash
-curl https://mcp.yourdomain.com
+tailscale ip -4
 ```
 
-Если возвращает ответ от MCP server — всё работает!
+Проверь доступность с другого устройства в Tailscale сети:
+
+```bash
+curl http://<tailscale-ip>:8765
+```
+
+В настройках расширения укажи MCP URL: `http://<tailscale-ip>:8765`
 
 ---
 
@@ -229,4 +235,4 @@ tail -n 10 data/tracker.jsonl | jq .
 
 ---
 
-Готово! MCP server работает на Pi и доступен через Cloudflare Tunnel.
+Готово! MCP server работает на Pi и доступен через Tailscale.

@@ -44,13 +44,15 @@ npm run dev
 
 Следуй `docs/mcp-deployment.md`
 
-### 2. Setup Cloudflare Tunnel
+### 2. Узнай Tailscale IP малины
 
-Следуй `docs/cloudflare-tunnel-setup.md`
+```bash
+tailscale ip -4
+```
 
 ### 3. Обнови настройки расширения
 
-Введи MCP URL: `https://mcp.yourdomain.com`
+Введи MCP URL: `http://<tailscale-ip>:8765`
 
 Теперь Claude будет вызывать MCP tools для получения актуального профиля и constraints.
 
