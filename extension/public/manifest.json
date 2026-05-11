@@ -11,14 +11,11 @@
   ],
   "host_permissions": [
     "https://api.anthropic.com/*",
+    "http://*:8765/*",
     "https://*.linkedin.com/*",
     "https://hh.ru/*",
     "https://career.habr.com/*",
     "https://stackoverflow.com/*"
-  ],
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js",

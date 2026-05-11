@@ -70,12 +70,6 @@ function Options() {
   };
 
   const handleSaveSettings = async () => {
-    if (mcpUrl) {
-      try {
-        const origin = new URL(mcpUrl).origin + '/*';
-        await chrome.permissions.request({ origins: [origin] });
-      } catch { /* ignore */ }
-    }
     await chrome.storage.local.set({ apiKey, mcpUrl });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
