@@ -20,26 +20,34 @@ function Options() {
     });
   }, []);
 
+  // Reload when tab or mcpUrl changes
   useEffect(() => {
-    if (tab === 'profile' && mcpUrl && !profileJson) loadProfile();
-    if (tab === 'priorities' && mcpUrl && !prioritiesJson) loadPriorities();
-  }, [tab]);
+    if (!mcpUrl) return;
+    if (tab === 'profile') loadProfile();
+    if (tab === 'priorities') loadPriorities();
+  }, [tab, mcpUrl]);
 
   const loadProfile = async () => {
     try {
+      setProfileJson('Загружаю...');
       const r = await fetch(`${mcpUrl}/profile`);
       setProfileJson(JSON.stringify(await r.json(), null, 2));
-    } catch { setProfileJson('// Не удалось загрузить. Проверь MCP URL в настройках.'); }
+    } catch {
+      setProfileJson('// Сервер недоступен. Проверь подключение.');
+    }
   };
 
   const loadPriorities = async () => {
     try {
+      setPrioritiesJson('Загружаю...');
       const r = await fetch(`${mcpUrl}/priorities`);
       setPrioritiesJson(JSON.stringify(await r.json(), null, 2));
-    } catch { setPrioritiesJson('// Не удалось загрузить. Проверь MCP URL в настройках.'); }
+    } catch {
+      setPrioritiesJson('// Сервер недоступен. Проверь подключение.');
+    }
   };
 
-  const saveJson = async (url: string, text: string) => {
+  const saveJson = async (endpoint: string, text: string) => {
     try {
       JSON.parse(text);
     } catch {
@@ -48,11 +56,12 @@ function Options() {
     }
     try {
       setEditorStatus('Сохраняю...');
-      await fetch(url, {
+      const r = await fetch(`${mcpUrl}/${endpoint}`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: text,
       });
+      if (!r.ok) throw new Error();
       setEditorStatus('✅ Сохранено');
       setTimeout(() => setEditorStatus(''), 2000);
     } catch {
@@ -61,32 +70,36 @@ function Options() {
   };
 
   const handleSaveSettings = async () => {
+    if (mcpUrl) {
+      try {
+        const origin = new URL(mcpUrl).origin + '/*';
+        await chrome.permissions.request({ origins: [origin] });
+      } catch { /* ignore */ }
+    }
     await chrome.storage.local.set({ apiKey, mcpUrl });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const testMcpConnection = async () => {
-    if (!mcpUrl) { alert('Введите MCP URL'); return; }
+  const testConnection = async () => {
+    if (!mcpUrl) { alert('Введи URL сервера'); return; }
     try {
-      const response = await fetch(`${mcpUrl}/context`);
-      if (response.ok) {
-        const data = await response.json();
-        alert(data.profile ? '✅ Сервер доступен, профиль загружен' : '⚠️ Сервер доступен, но profile.json не найден');
+      const r = await fetch(`${mcpUrl}/context`);
+      if (r.ok) {
+        const d = await r.json();
+        alert(d.profile ? '✅ Сервер доступен, профиль загружен' : '⚠️ Сервер доступен, но profile.json не найден');
       } else {
-        alert('⚠️ Сервер вернул ошибку: ' + response.status);
+        alert('⚠️ Сервер вернул ' + r.status);
       }
     } catch (e) {
-      alert('❌ Не удалось подключиться:\n' + (e as Error).message);
+      alert('❌ Недоступен:\n' + (e as Error).message);
     }
   };
 
   return (
     <div className="options">
       <div className="container">
-        <header>
-          <h1>Job Match AI</h1>
-        </header>
+        <header><h1>Job Match AI</h1></header>
 
         <div className="tabs">
           {(['settings', 'profile', 'priorities'] as Tab[]).map(t => (
@@ -109,8 +122,8 @@ function Options() {
               <h2>Career Server</h2>
               <div className="form-group">
                 <label>URL сервера</label>
-                <input type="url" value={mcpUrl} onChange={e => setMcpUrl(e.target.value)} placeholder="http://100.x.x.x:8765" />
-                <button className="secondary-btn" onClick={testMcpConnection}>Проверить подключение</button>
+                <input type="url" value={mcpUrl} onChange={e => setMcpUrl(e.target.value)} placeholder="http://100.64.0.2:8765" />
+                <button className="secondary-btn" onClick={testConnection}>Проверить подключение</button>
               </div>
             </div>
             <div className="actions">
@@ -124,7 +137,7 @@ function Options() {
         {(tab === 'profile' || tab === 'priorities') && (
           <div className="section">
             {!mcpUrl ? (
-              <p className="help-text">Укажи URL сервера во вкладке Настройки.</p>
+              <p className="help-text">Укажи URL сервера во вкладке Настройки и сохрани.</p>
             ) : (
               <>
                 <div className="editor-actions">
@@ -132,10 +145,7 @@ function Options() {
                     Обновить с сервера
                   </button>
                   <button className="primary-btn" onClick={() =>
-                    saveJson(
-                      `${mcpUrl}/${tab}`,
-                      tab === 'profile' ? profileJson : prioritiesJson
-                    )
+                    saveJson(tab, tab === 'profile' ? profileJson : prioritiesJson)
                   }>
                     Сохранить на сервер
                   </button>
