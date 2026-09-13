@@ -9,6 +9,7 @@ Expose four tools: add_vacancy, list_vacancies, read_criteria, update_vacancy.
 """
 
 from pathlib import Path
+from datetime import date, datetime, timedelta
 import csv
 import io
 
@@ -360,6 +361,169 @@ def update_vacancy(
 
     header = f"Обновлена вакансия: {old_row['Компания']} — {old_row['Позиция']}\n"
     return header + "\n".join(changes)
+
+
+def _parse_date(s: str) -> date | None:
+    """Parse DD.MM.YYYY; return None for approximate (~) or unparseable dates."""
+    s = s.strip()
+    if not s or s[0] not in "0123456789":
+        return None
+    try:
+        return datetime.strptime(s[:10], "%d.%m.%Y").date()
+    except ValueError:
+        return None
+
+
+@mcp.tool()
+def analyze_pipeline(from_date: str = "") -> dict:
+    """Analyze the vacancy pipeline and return structured statistics.
+
+    Use this tool when the user asks about their job search pipeline,
+    funnel conversion rates, activity patterns, or search intensity.
+
+    Parameters:
+        from_date — optional start date in DD.MM.YYYY format; when set,
+                    only vacancies whose date parses to on-or-after this
+                    value are counted. Rows with approximate dates (starting
+                    with ~) are excluded from date-filtered results but
+                    included when no filter is set.
+
+    Returns a dict with these keys:
+
+        total               — int, vacancies in scope
+        by_status           — {status: count}
+        by_employer_type    — {type: count}
+        by_match            — {score: count}
+
+        funnel              — pipeline from first application to outcome:
+          applied           — int (откликнулся + в переписке + интервью + отказ)
+          in_dialogue       — int (в переписке + интервью + отказ)
+          at_interview      — int (интервью + отказ)
+          rejected          — int (отказ)
+          rate_to_dialogue  — float, in_dialogue / applied, or null
+          rate_to_interview — float, at_interview / in_dialogue, or null
+          rate_to_rejection — float, rejected / at_interview, or null
+
+        rejections          — breakdown of rows with Статус=отказ:
+          by_language       — {language: count}
+          by_employer_type  — {type: count}
+
+        by_role_level       — for each Уровень роли:
+          {level: {total, got_response, went_silent}}
+          got_response: в переписке + интервью + отказ
+          went_silent:  затухла
+
+        activity            — temporal patterns (only rows with parseable dates):
+          by_week           — {"YYYY-Www": count} sorted chronologically
+          by_month          — {"YYYY-MM": count} sorted chronologically
+          gaps_over_7_days  — list of {from, to, days} for gaps > 7 days
+          days_since_last   — int, days from most recent parseable date to today
+    """
+    rows = _read_rows()
+
+    cutoff: date | None = None
+    if from_date.strip():
+        cutoff = _parse_date(from_date)
+
+    if cutoff:
+        rows = [r for r in rows if (d := _parse_date(r.get("Дата", ""))) and d >= cutoff]
+
+    total = len(rows)
+
+    def count_field(field: str) -> dict:
+        result: dict[str, int] = {}
+        for r in rows:
+            v = r.get(field, "") or "—"
+            result[v] = result.get(v, 0) + 1
+        return result
+
+    by_status = count_field("Статус")
+    by_etype  = count_field("Тип работодателя")
+    by_match  = count_field("Оценка матча")
+
+    s = by_status
+    applied      = sum(s.get(k, 0) for k in ("откликнулся", "в переписке", "интервью", "отказ"))
+    in_dialogue  = sum(s.get(k, 0) for k in ("в переписке", "интервью", "отказ"))
+    at_interview = sum(s.get(k, 0) for k in ("интервью", "отказ"))
+    rejected     = s.get("отказ", 0)
+
+    def rate(num: int, den: int) -> float | None:
+        return round(num / den, 3) if den else None
+
+    funnel = {
+        "applied":           applied,
+        "in_dialogue":       in_dialogue,
+        "at_interview":      at_interview,
+        "rejected":          rejected,
+        "rate_to_dialogue":  rate(in_dialogue,  applied),
+        "rate_to_interview": rate(at_interview, in_dialogue),
+        "rate_to_rejection": rate(rejected,     at_interview),
+    }
+
+    rejection_rows = [r for r in rows if r.get("Статус") == "отказ"]
+    rejections = {
+        "by_language":      count_field_in("Язык (требование)", rejection_rows),
+        "by_employer_type": count_field_in("Тип работодателя", rejection_rows),
+    }
+
+    role_stats: dict[str, dict] = {}
+    for r in rows:
+        level = r.get("Уровень роли") or "—"
+        st    = r.get("Статус", "")
+        entry = role_stats.setdefault(level, {"total": 0, "got_response": 0, "went_silent": 0})
+        entry["total"] += 1
+        if st in ("в переписке", "интервью", "отказ"):
+            entry["got_response"] += 1
+        if st == "затухла":
+            entry["went_silent"] += 1
+
+    dated = sorted(
+        ((d, r) for r in rows if (d := _parse_date(r.get("Дата", "")))),
+        key=lambda x: x[0],
+    )
+
+    by_week:  dict[str, int] = {}
+    by_month: dict[str, int] = {}
+    for d, _ in dated:
+        wk = f"{d.isocalendar()[0]}-W{d.isocalendar()[1]:02d}"
+        mo = d.strftime("%Y-%m")
+        by_week[wk]  = by_week.get(wk, 0) + 1
+        by_month[mo] = by_month.get(mo, 0) + 1
+
+    gaps = []
+    for (d1, _), (d2, _) in zip(dated, dated[1:]):
+        delta = (d2 - d1).days
+        if delta > 7:
+            gaps.append({"from": d1.strftime("%d.%m.%Y"), "to": d2.strftime("%d.%m.%Y"), "days": delta})
+
+    today = date.today()
+    days_since = (today - dated[-1][0]).days if dated else None
+
+    activity = {
+        "by_week":          by_week,
+        "by_month":         by_month,
+        "gaps_over_7_days": gaps,
+        "days_since_last":  days_since,
+    }
+
+    return {
+        "total":            total,
+        "by_status":        by_status,
+        "by_employer_type": by_etype,
+        "by_match":         by_match,
+        "funnel":           funnel,
+        "rejections":       rejections,
+        "by_role_level":    role_stats,
+        "activity":         activity,
+    }
+
+
+def count_field_in(field: str, rows: list[dict]) -> dict:
+    result: dict[str, int] = {}
+    for r in rows:
+        v = r.get(field, "") or "—"
+        result[v] = result.get(v, 0) + 1
+    return result
 
 
 if __name__ == "__main__":
