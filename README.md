@@ -1,140 +1,124 @@
 # Job Match AI
 
-Chrome extension для анализа вакансий на match с карьерным профилем через Claude API + MCP server.
+Pet-проект для ведения реестра вакансий и анализа job-match через Claude.
 
-## Архитектура
+## Статус
+
+**v1 (Chrome extension) — закрыт.**
+**v2 (MCP server для Claude Desktop) — активная разработка.**
+
+### Почему v1 закрыт
+
+Chrome-расширение решало не ту задачу. Оно было заточено под высокочастотный
+скрининг — быстро анализировать десятки вакансий в день прямо в браузере.
+Реальный поток оказался другим: ~100 вакансий в квартал, а не в день.
+При таком ритме накладные расходы (держать расширение, Pi, Tailscale,
+настраивать API-ключ) не оправданы.
+
+Параллельно ниша «AI match-scoring для вакансий» оказалась плотно
+занята бесплатными аналогами — Simplify, Teal, JobScan и другими.
+Делать конкурента без явного преимущества смысла нет.
+
+Код v1 сохранён в `/extension` и `/mcp-server` как есть.
+
+---
+
+## v2 — MCP server для Claude Desktop
+
+Новая точка входа: не браузер, а прямой разговор с Claude в десктопном
+приложении. MCP-сервер даёт Claude инструменты для работы с реестром
+вакансий — добавлять, обновлять, фильтровать, читать критерии.
+
+### Архитектура
 
 ```
-┌─────────────────┐
-│  Chrome Browser │
-│                 │
-│  ┌───────────┐  │
-│  │ Extension │  │──┐
-│  └───────────┘  │  │
-└─────────────────┘  │
-                     │ HTTPS
-                     ▼
-            ┌─────────────────┐
-            │ Anthropic API   │
-            │ (Claude Sonnet) │
-            └─────────────────┘
-                     │
-                     │ MCP Protocol
-                     ▼
-            ┌─────────────────┐
-            │   Raspberry Pi  │
-            │                 │
-            │  ┌───────────┐  │
-            │  │MCP Server │  │
-            │  │(FastMCP)  │  │
-            │  └───────────┘  │
-            │        │        │
-            │        ▼        │
-            │  career-context │
-            │  priorities     │
-            │  blacklist      │
-            └─────────────────┘
+Claude Desktop
+     │  stdio
+     ▼
+MCP Server (mcp-stdio/server.py)
+     │  Path(__file__).parent.parent / "data"
+     ▼
+data/
+  vacancies.csv   ← реестр, UTF-8 BOM, 12 колонок
+  criteria.md     ← критерии отбора, редактируется вручную
 ```
 
-## Компоненты
+Сервер не знает о браузере, Pi и Tailscale. Всё локально.
 
-### 1. Chrome Extension (`/extension`)
-- **Service Worker**: API calls, context menu, storage management
-- **Popup**: результаты анализа (match score, flags, recommendation)
-- **Options Page**: настройки (API key, MCP URL)
-- **Content Scripts**: извлечение текста вакансий с job boards
+### Инструменты
 
-### 2. MCP Server (`/mcp-server`)
-- **FastMCP** на Python
-- **Tools**:
-  - `get_career_context()` — полный карьерный профиль
-  - `get_current_priorities()` — актуальные constraints (location, язык, health)
-  - `get_blacklisted_companies()` — список спамных рекрутеров/компаний
-  - `save_analysis()` — сохранение результатов анализа (application tracker)
+| Инструмент | Что делает |
+|---|---|
+| `add_vacancy` | Добавить вакансию в реестр (новые записи сверху) |
+| `list_vacancies` | Список с фильтрами по Статусу и Типу работодателя |
+| `update_vacancy` | Обновить поля существующей записи (поиск по Компания + Позиция) |
+| `read_criteria` | Прочитать criteria.md целиком |
 
-### 3. Deployment (`/docs`)
-- Tailscale setup на Pi
-- Systemd service для MCP server
-- Testing guides
+### Словари классификаторов
 
-## Quick Start
+Шесть колонок с закрытым списком значений:
 
-### Extension (локальная установка)
+| Колонка | Значения |
+|---|---|
+| Статус | новая, отклонена, к отклику, откликнулся, в переписке, интервью, отказ, затухла |
+| Оценка матча | сильный, хороший, средний, слабый |
+| Тип работодателя | A (inhouse), B (inhouse через агентство), C (SI / консалтинг / вендор) |
+| Язык (требование) | EN, EN+DE желателен, DE обязателен, не указан |
+| Уровень роли | Application Manager, IT Business Partner, Team Lead, Project Manager, Architect / Consultant, прочее |
+| Источник | LinkedIn, Xing, рекрутер, сайт компании, джоб-борд, прочее |
+
+Сервер валидирует эти поля при добавлении и обновлении записей.
+
+### Запуск
+
 ```bash
-cd extension
-npm install
-npm run dev
-# Загрузить unpacked extension из extension/dist в chrome://extensions
+cd mcp-stdio
+uv run python server.py
 ```
 
-### MCP Server (на Pi)
+### Подключение к Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "job-match-ai": {
+      "command": "/opt/homebrew/bin/uv",
+      "args": [
+        "run",
+        "--project",
+        "/Users/olegbolsunov/Projects/MatchJobAIExt9/mcp-stdio",
+        "python",
+        "/Users/olegbolsunov/Projects/MatchJobAIExt9/mcp-stdio/server.py"
+      ]
+    }
+  }
+}
+```
+
+После сохранения — полный Quit и перезапуск Claude Desktop.
+
+### Структура проекта
+
+```
+MatchJobAIExt9/
+├── mcp-stdio/          # v2 — MCP server (активный)
+│   ├── server.py
+│   ├── pyproject.toml
+│   └── uv.lock
+├── data/               # рабочие данные (в .gitignore)
+│   ├── vacancies.csv   # симлинк на актуальную версию
+│   └── criteria.md     # симлинк на актуальную версию
+├── extension/          # v1 — Chrome extension (закрыт)
+└── mcp-server/         # v1 — FastAPI server на Pi (закрыт)
+```
+
+### Обновление файлов данных
+
+Данные хранятся с датой в имени (`vacancies1209.csv`).
+При сохранении новой версии обновить симлинк:
+
 ```bash
-cd mcp-server
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python career_mcp.py
+ln -sf vacancies1301.csv ~/Projects/MatchJobAIExt9/data/vacancies.csv
 ```
-
-### Tailscale
-```bash
-# Узнай IP малины
-tailscale ip -4
-# Укажи в настройках расширения: http://<tailscale-ip>:8765
-```
-
-## MVP Features (v0.1)
-
-- ✅ Context menu: "Analyze Job Match" на выделенном тексте
-- ✅ MCP integration для динамического профиля
-- ✅ Claude Sonnet 4.6 analysis
-- ✅ Popup с результатами (score, flags, reasoning на русском)
-- ✅ Settings page (API key, MCP URL)
-
-## V2 Features (backlog)
-
-- 📋 Application tracker (сохранение analyzed jobs)
-- 📊 Dashboard с историей анализов
-- 📝 Cover letter generator
-- 📂 Files API для статичного resume (экономия tokens)
-- 🌐 Multi-language support (English output option)
-
-## Tech Stack
-
-- **Frontend**: TypeScript, React, Vite, Manifest v3
-- **Backend**: Python 3.11+, FastMCP
-- **API**: Anthropic Claude Sonnet 4.6
-- **Network**: Tailscale
-- **Storage**: Chrome Storage API (local + sync)
-
-## Структура проекта
-
-```
-job-match-ai/
-├── extension/
-│   ├── src/
-│   │   ├── background/      # Service worker
-│   │   ├── popup/           # Popup UI
-│   │   ├── options/         # Settings page
-│   │   ├── content/         # Content scripts
-│   │   └── lib/             # Shared utilities
-│   ├── public/
-│   │   └── manifest.json
-│   └── package.json
-├── mcp-server/
-│   ├── career_mcp.py        # FastMCP server
-│   ├── data/
-│   │   ├── profile.json     # Career context
-│   │   ├── priorities.json  # Current constraints
-│   │   └── blacklist.json   # Filtered companies
-│   ├── requirements.txt
-│   └── systemd/
-│       └── career-mcp.service
-└── docs/
-    ├── mcp-deployment.md
-    └── extension-development.md
-```
-
-## License
-
-MIT
