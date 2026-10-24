@@ -11,7 +11,10 @@ Expose four tools: add_vacancy, list_vacancies, read_criteria, update_vacancy.
 from pathlib import Path
 from datetime import date, datetime, timedelta
 import csv
+import difflib
 import io
+import re
+import shutil
 
 from fastmcp import FastMCP
 
@@ -104,6 +107,56 @@ def _write_rows(rows: list[dict]) -> None:
         writer.writeheader()
         writer.writerows(rows)
     tmp.replace(VACANCIES_FILE)  # atomic on POSIX / macOS
+
+
+JOURNAL_HEADING = "## Журнал изменений"
+
+
+def _edit_criteria(criteria_file: Path, old_text: str, new_text: str, reason: str) -> str:
+    """Replace one unique fragment of criteria_file; back up first, log the change."""
+    # criteria.md is a symlink to a versioned file: write to the target so the link survives.
+    real = criteria_file.resolve()
+    reason = " ".join(reason.split()).rstrip(".")
+
+    if not old_text:
+        return "Ошибка: old_text пустой. Файл не изменён."
+    if old_text == new_text:
+        return "Ошибка: new_text совпадает с old_text. Файл не изменён."
+    if not reason:
+        return "Ошибка: не указана причина (reason). Файл не изменён."
+
+    before = real.read_bytes().decode("utf-8")
+    count = before.count(old_text)
+    if count != 1:
+        return f"Ошибка: old_text найден {count} раз, нужно ровно 1. Файл не изменён."
+
+    after = before.replace(old_text, new_text, 1)
+    entry = f"- {date.today():%d.%m.%Y}: {reason}."
+    if re.search(rf"^{JOURNAL_HEADING}\s*$", after, re.MULTILINE):
+        after = after.rstrip("\n") + f"\n{entry}\n"
+    else:
+        after = after.rstrip("\n") + f"\n\n{JOURNAL_HEADING}\n\n{entry}\n"
+
+    history = real.parent / "criteria_history"
+    history.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup = history / f"criteria_{stamp}.md"
+    n = 2
+    while backup.exists():  # two edits within one second
+        backup = history / f"criteria_{stamp}_{n}.md"
+        n += 1
+    shutil.copy2(real, backup)
+
+    tmp = real.with_suffix(".tmp")
+    tmp.write_bytes(after.encode("utf-8"))
+    shutil.copymode(real, tmp)
+    tmp.replace(real)
+
+    diff = "\n".join(difflib.unified_diff(
+        before.splitlines(), after.splitlines(),
+        "criteria.md (до)", "criteria.md (после)", n=3, lineterm="",
+    ))
+    return f"Готово. Резервная копия: {backup}\n\n{diff}"
 
 
 # ── MCP server ─────────────────────────────────────────────────────────────────
@@ -229,6 +282,28 @@ def read_criteria() -> str:
     """
     _ensure_files()
     return CRITERIA_FILE.read_text(encoding="utf-8")
+
+
+@mcp.tool()
+def update_criteria(old_text: str, new_text: str, reason: str) -> str:
+    """Replace one fragment of criteria.md with new text.
+
+    Call this ONLY after the user has explicitly confirmed the change in chat.
+    First show the user the exact edit (old text → new text) and wait for approval.
+
+    Parameters:
+        old_text — fragment to replace; must occur in criteria.md exactly once.
+                   If it occurs 0 or several times, nothing is changed and the
+                   number of matches is returned — quote more surrounding text.
+        new_text — replacement; an empty string deletes the fragment.
+        reason   — short explanation, written to "## Журнал изменений" at the
+                   end of criteria.md as "- DD.MM.YYYY: <reason>."
+
+    Before writing, the current version is copied to criteria_history/ next to
+    the file. Returns the backup path and a unified diff of the change.
+    """
+    _ensure_files()
+    return _edit_criteria(CRITERIA_FILE, old_text, new_text, reason)
 
 
 @mcp.tool()

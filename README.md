@@ -34,6 +34,7 @@ data/criteria.md     ← selection criteria, edited manually
 | `list_vacancies` | List with optional filters by Status and Employer type |
 | `update_vacancy` | Update any fields; find by Company + Position substring |
 | `read_criteria` | Return full contents of criteria.md |
+| `update_criteria` | Replace one unique fragment of criteria.md; backs up the file first, logs the change, returns a diff |
 | `analyze_pipeline` | Funnel stats, status/type/match distributions, activity timeline |
 
 ## Registry schema
