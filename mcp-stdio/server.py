@@ -21,7 +21,7 @@ VACANCIES_FILE = DATA_DIR / "vacancies.csv"
 CRITERIA_FILE = DATA_DIR / "criteria.md"
 
 # ── Closed-list dictionaries (edit here, validation uses these automatically) ──
-DICT_STATUS = {"новая", "отклонена", "к отклику", "откликнулся", "в переписке", "интервью", "отказ", "затухла"}
+DICT_STATUS = {"новая", "отклонена", "к отклику", "откликнулся", "в переписке", "интервью", "отказ", "затухла", "отложена (язык)"}
 DICT_MATCH  = {"сильный", "хороший", "средний", "слабый"}
 DICT_ETYPE  = {"A", "B", "C"}
 DICT_LANG   = {"EN", "EN+DE желателен", "DE обязателен", "не указан"}
