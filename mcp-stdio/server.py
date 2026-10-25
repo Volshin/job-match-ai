@@ -16,12 +16,19 @@ import io
 import re
 import shutil
 
+import sys
+
 from fastmcp import FastMCP
+
+import dashboard
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DATA_DIR = Path(__file__).parent.parent / "data"
 VACANCIES_FILE = DATA_DIR / "vacancies.csv"
 CRITERIA_FILE = DATA_DIR / "criteria.md"
+# The private dashboard stays in data/ (gitignored); only the public one goes to docs/ (GitHub Pages).
+PRIVATE_DASHBOARD = DATA_DIR / "dashboard.html"
+PUBLIC_DASHBOARD = Path(__file__).parent.parent / "docs" / "index.html"
 
 # ── Closed-list dictionaries (edit here, validation uses these automatically) ──
 DICT_STATUS = {"новая", "отклонена", "к отклику", "откликнулся", "в переписке", "интервью", "отказ", "затухла", "отложена (язык)"}
@@ -601,5 +608,43 @@ def count_field_in(field: str, rows: list[dict]) -> dict:
     return result
 
 
+def _build_dashboard(rows: list[dict], public: bool, out_file: Path) -> str:
+    """Render the dashboard for rows into out_file (atomic write)."""
+    data = dashboard.build_data(rows, public)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_file.with_suffix(".tmp")
+    tmp.write_text(dashboard.render_html(data), encoding="utf-8")
+    tmp.replace(out_file)
+    kind = "публичная" if public else "личная"
+    return (f"Готово ({kind} версия): {out_file}\n"
+            f"Вакансий в учёте: {data['meta']['total']}, незакрытых: {len(data['open'])}")
+
+
+@mcp.tool()
+def build_dashboard(public: bool = False) -> str:
+    """Build a single-file HTML dashboard (funnel, statuses, weekly activity,
+    language in rejections, response rate by role level, table of open vacancies)
+    from the registry.
+
+    Parameters:
+        public — False (default): full personal version, written to
+                 data/dashboard.html (not tracked by git).
+                 True: anonymised version for GitHub Pages, written to
+                 docs/index.html. Companies become "Tier X, country", positions
+                 become role levels, notes ("Вывод / причина") and CV versions
+                 are dropped.
+
+    The file is a snapshot: data is embedded at build time, so rebuild after
+    registry changes.
+    """
+    out = PUBLIC_DASHBOARD if public else PRIVATE_DASHBOARD
+    return _build_dashboard(_read_rows(), public, out)
+
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    if sys.argv[1:2] == ["build-dashboard"]:
+        # CLI for scripts (publish.sh): server.py build-dashboard [--public]
+        _public = "--public" in sys.argv[2:]
+        print(_build_dashboard(_read_rows(), _public, PUBLIC_DASHBOARD if _public else PRIVATE_DASHBOARD))
+    else:
+        mcp.run(transport="stdio")
