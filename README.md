@@ -8,23 +8,34 @@ conversation with Claude.
 Designed for a deliberate, low-volume search: ~100 carefully selected
 vacancies per quarter rather than mass applications.
 
+**Live dashboard (anonymised):** https://volshin.github.io/job-match-ai/
+
 ---
 
 ## How it works
 
-Claude Desktop connects to the server via stdio. You talk to Claude;
-Claude calls the tools; the registry stays on your machine.
+Claude Desktop (or Claude Code) connects to the server via stdio. You talk
+to Claude; Claude calls the tools; the registry stays on your machine.
+A dashboard is built from the registry on demand.
 
 ```
-Claude Desktop
-     │  stdio
+Agent (Claude Desktop / Claude Code)
+     │  MCP over stdio
      ▼
 mcp-stdio/server.py
      │
-     ▼
-data/vacancies.csv   ← structured registry, 12 columns
-data/criteria.md     ← selection criteria, edited manually
+     ├──▶ data/criteria.md      ← selection criteria (backed up on every edit)
+     └──▶ data/vacancies.csv    ← structured registry, 12 columns
+               │
+               │  build_dashboard
+               ▼
+     data/dashboard.html        ← personal version, stays local
+     docs/index.html            ← public version, anonymised → GitHub Pages
 ```
+
+Both dashboard files are single HTML pages with the data embedded at build
+time (charts are drawn by d3, loaded from a CDN). They are snapshots:
+rebuild after the registry changes.
 
 ## Tools
 
@@ -36,6 +47,31 @@ data/criteria.md     ← selection criteria, edited manually
 | `read_criteria` | Return full contents of criteria.md |
 | `update_criteria` | Replace one unique fragment of criteria.md; backs up the file first, logs the change, returns a diff |
 | `analyze_pipeline` | Funnel stats, status/type/match distributions, activity timeline |
+| `build_dashboard` | Build the HTML dashboard: `public=false` → `data/dashboard.html` (full), `public=true` → `docs/index.html` (anonymised) |
+
+## Dashboard
+
+Blocks: funnel, statuses, vacancies per week, language in rejections,
+response rate by role level, and a filterable table of open vacancies.
+
+The public version replaces company names with "Tier X, country", shows the
+role level instead of the position title, and drops the "Вывод / причина"
+and "Версия CV" columns.
+
+```bash
+# from the Claude chat: ask for build_dashboard, or from a terminal:
+cd mcp-stdio
+uv run python server.py build-dashboard             # personal → data/dashboard.html
+uv run python server.py build-dashboard --public    # public   → docs/index.html
+
+# build the public version, commit docs/ and push (from main):
+./publish.sh
+./publish.sh --dry-run    # build only
+```
+
+GitHub Pages: Settings → Pages → Deploy from a branch → `main` / `/docs`.
+`launchd/com.pet9.publish-dashboard.plist` is a ready daily-publish job;
+it is not enabled, see the comments inside for how to turn it on.
 
 ## Registry schema
 
@@ -105,12 +141,18 @@ The `data/` directory is in `.gitignore` — registry contents stay local.
 ```
 MatchJobAIExt9/
 ├── mcp-stdio/          # v2 — active
-│   ├── server.py
+│   ├── server.py       # MCP tools
+│   ├── dashboard.py    # dashboard builder
+│   ├── tests/
 │   ├── pyproject.toml
 │   └── uv.lock
+├── docs/               # GitHub Pages: public dashboard (index.html)
+├── launchd/            # optional daily publish job (disabled)
+├── publish.sh          # build public dashboard + git push
 ├── data/               # working data, not tracked by git
 │   ├── vacancies.csv   → vacancies1209.csv (symlink)
-│   └── criteria.md     → criteria-v2_1.md  (symlink)
+│   ├── criteria.md     → criteria-v2_1.md  (symlink)
+│   └── dashboard.html  # personal dashboard
 ├── extension/          # v1 — archived, not maintained
 └── mcp-server/         # v1 — archived, not maintained
 ```
