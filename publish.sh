@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rebuild the public (anonymised) dashboard and publish it via GitHub Pages.
+# Rebuild the public (demo-data) dashboard and publish it via GitHub Pages.
 # Usage: ./publish.sh            build, commit docs/ and push
 #        ./publish.sh --dry-run  build only, do not commit or push
 set -euo pipefail

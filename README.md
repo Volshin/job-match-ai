@@ -5,10 +5,11 @@ a job search registry. Log vacancies, update statuses, filter by any
 combination of classifiers, and analyze your pipeline — all through
 conversation with Claude.
 
+**Dashboard demo (generated data):** https://volshin.github.io/job-match-ai/
+
 Designed for a deliberate, low-volume search: ~100 carefully selected
 vacancies per quarter rather than mass applications.
 
-**Live dashboard (anonymised):** https://volshin.github.io/job-match-ai/
 
 ---
 
@@ -30,7 +31,7 @@ mcp-stdio/server.py
                │  build_dashboard
                ▼
      data/dashboard.html        ← personal version, stays local
-     docs/index.html            ← public version, anonymised → GitHub Pages
+     docs/index.html            ← public demo version → GitHub Pages
 ```
 
 Both dashboard files are single HTML pages with the data embedded at build
@@ -47,16 +48,15 @@ rebuild after the registry changes.
 | `read_criteria` | Return full contents of criteria.md |
 | `update_criteria` | Replace one unique fragment of criteria.md; backs up the file first, logs the change, returns a diff |
 | `analyze_pipeline` | Funnel stats, status/type/match distributions, activity timeline |
-| `build_dashboard` | Build the HTML dashboard: `public=false` → `data/dashboard.html` (full), `public=true` → `docs/index.html` (anonymised) |
+| `build_dashboard` | Build the HTML dashboard: `public=false` → `data/dashboard.html` (full), `public=true` → `docs/index.html` (demo data) |
 
 ## Dashboard
 
 Blocks: funnel, statuses, vacancies per week, language in rejections,
 response rate by role level, and a filterable table of open vacancies.
 
-The public version replaces company names with "Tier X, country", shows the
-role level instead of the position title, and drops the "Вывод / причина"
-and "Версия CV" columns.
+The public version is built from generated demo data, not from the registry:
+the real search never leaves the machine. The page says so in its subtitle.
 
 ```bash
 # from the Claude chat: ask for build_dashboard, or from a terminal:

@@ -13,17 +13,17 @@ import json
 D3_URL = "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
 D3_SRI = "sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"
 
-APPLIED   = ("откликнулся", "в переписке", "интервью", "отказ", "затухла")
-REPLIED   = ("в переписке", "интервью", "отказ")
+APPLIED   = ("откликнулся", "в переписке", "интервью", "отказ", "затухла", "оффер")
+REPLIED   = ("в переписке", "интервью", "отказ", "оффер")
 OPEN      = ("новая", "к отклику", "отложена (язык)", "откликнулся")
-LEVELS    = ("Project Manager", "Team Lead", "Application Manager",
-             "IT Business Partner", "Architect / Consultant", "Прочее")
+LEVELS    = ("Project Manager", "Program Manager", "Team Lead", "Application Manager",
+             "IT Business Partner", "Architect / Consultant", "AI", "Прочее")
 
 STATUS_LABELS = {
     "отклонена": "Отсеяна до отклика", "отказ": "Отказ", "к отклику": "К отклику",
     "новая": "Новая", "затухла": "Затухла", "в переписке": "В переписке",
     "отложена (язык)": "Отложена по языку", "откликнулся": "Откликнулся",
-    "интервью": "Интервью",
+    "интервью": "Интервью", "оффер": "Оффер",
 }
 LANG_LABELS = {
     "DE обязателен": "Немецкий обязателен", "EN": "Английский",
@@ -76,6 +76,51 @@ def _short(company: str) -> str:
     return html.unescape((company or "").split(" (")[0])
 
 
+_DEMO_COMPANIES = ("Nordlicht Systems", "Polderdata", "Kestrel Logistics", "Hanse Retail Group",
+                   "Veluwe Foods", "Brightmoor Pharma", "Alder Energy", "Rheinwerk Automotive",
+                   "Tulpen Bank", "Isarblick Insurance", "Delta Port Services", "Elbe Chemicals")
+_DEMO_LOCATIONS = ("Amsterdam, NL", "Rotterdam, NL", "Utrecht, NL (Hybrid)", "Munich, DE",
+                   "Hamburg, DE", "Frankfurt, DE (Hybrid)", "Berlin, DE", "Walldorf, DE", "Remote")
+# closed statuses go to the older vacancies, open ones to the most recent
+_DEMO_CLOSED = {"отклонена": 52, "отказ": 22, "затухла": 18, "интервью": 7, "в переписке": 5, "оффер": 2}
+_DEMO_OPEN   = {"откликнулся": 16, "новая": 9, "к отклику": 6, "отложена (язык)": 3}
+
+
+def demo_rows(today: date | None = None, weeks: int = 14) -> list[dict]:
+    """Synthetic registry for the public page: the real search stays private.
+    Deterministic for a given date, so a rebuild without changes gives the same file."""
+    import random
+    rnd = random.Random(9)
+    today = today or date.today()
+    n = sum(_DEMO_CLOSED.values()) + sum(_DEMO_OPEN.values())
+    # activity grows over time: later days are picked more often
+    days = [today - timedelta(days=i) for i in range(weeks * 7)]
+    dates = sorted(rnd.choices(days, weights=[weeks * 7 - i + 20 for i in range(len(days))], k=n))
+
+    def pool(counts):
+        p = [s for s, c in counts.items() for _ in range(c)]
+        rnd.shuffle(p)
+        return p
+
+    statuses = pool(_DEMO_CLOSED) + pool(_DEMO_OPEN)
+    rows = []
+    for d, st in zip(dates, statuses):
+        lang = rnd.choices(("EN", "EN+DE желателен", "DE обязателен", "не указан"),
+                           weights=(5, 2, 4 if st == "отклонена" else 1, 2))[0]
+        rows.append({
+            "Дата": d.strftime("%d.%m.%Y"),
+            "Компания": rnd.choice(_DEMO_COMPANIES),
+            "Позиция": "",
+            "Локация": rnd.choice(_DEMO_LOCATIONS),
+            "Тип работодателя": rnd.choices("ABC", weights=(3, 4, 3))[0],
+            "Язык (требование)": lang,
+            "Уровень роли": rnd.choices(LEVELS, weights=(10, 4, 5, 3, 3, 4, 5, 3))[0],
+            "Статус": st,
+            "Оценка матча": rnd.choice(("сильный", "хороший", "хороший", "средний", "слабый")),
+        })
+    return rows
+
+
 def build_data(rows: list[dict], public: bool) -> dict:
     """Aggregate rows into the JSON the page renders. public=True strips identifying fields."""
     # duplicates are marked in Позиция and must not count
@@ -90,9 +135,10 @@ def build_data(rows: list[dict], public: bool) -> dict:
         {"label": "Прошли отсев",        "count": n - st["отклонена"]},
         {"label": "Откликов отправлено", "count": applied},
         {"label": "Получили ответ",      "count": replied},
-        {"label": "Диалог или интервью", "count": st["в переписке"] + st["интервью"]},
-        {"label": "Интервью",            "count": st["интервью"]},
-        {"label": "Оффер",               "count": 0},
+        # an offer has been through interviews, so it counts in every stage above
+        {"label": "Диалог или интервью", "count": st["в переписке"] + st["интервью"] + st["оффер"]},
+        {"label": "Интервью",            "count": st["интервью"] + st["оффер"]},
+        {"label": "Оффер",               "count": st["оффер"]},
     ]
 
     status = [{"label": STATUS_LABELS.get(k, k), "count": v} for k, v in st.most_common()]
@@ -178,7 +224,10 @@ _TEMPLATE = """<!doctype html>
 }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
-main { max-width:960px; margin:0 auto; padding:24px 16px 48px; }
+main { max-width:1440px; margin:0 auto; padding:24px 16px 48px; }
+.grid { display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:16px; }
+.grid section { margin-bottom:0; }
+@media (min-width:1000px) { .grid { grid-template-columns:1fr 1fr; } }
 h1 { font-size:24px; margin:0 0 4px; }
 .sub { color:var(--muted); margin:0 0 24px; }
 section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
@@ -198,6 +247,9 @@ select { margin-left:6px; padding:4px 6px; background:var(--card); color:var(--f
 table { border-collapse:collapse; width:100%; font-size:13px; }
 th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
 th { color:var(--muted); font-weight:600; white-space:nowrap; }
+td.c-date, td.c-tier, td.c-lang, td.c-match, td.c-status { white-space:nowrap; }
+td.c-company, td.c-position, td.c-location { min-width:110px; max-width:190px; }
+td.c-note { width:100%; min-width:280px; }
 .empty { color:var(--muted); padding:12px 0; }
 </style>
 </head>
@@ -205,11 +257,13 @@ th { color:var(--muted); font-weight:600; white-space:nowrap; }
 <main>
   <h1>Воронка поиска работы</h1>
   <p class="sub" id="sub"></p>
+  <div class="grid">
   <section><h2>Воронка</h2><p class="hint">Доля считается от всех разобранных вакансий.</p><div id="funnel"></div></section>
   <section><h2>Статусы</h2><div id="status"></div></section>
   <section><h2>Вакансии по неделям</h2><p class="hint">Неделя начинается с понедельника.</p><div id="weekly"></div></section>
+  <section><h2>Ответы по уровню роли</h2><p class="hint">Тёмная часть полосы: получили ответ (переписка, интервью, отказ, оффер). В подписи: сколько затухли.</p><div id="roles"></div></section>
   <section><h2>Язык в отсеве</h2><p class="hint">Требование к языку у вакансий, отсеянных до отклика.</p><div id="lang"></div></section>
-  <section><h2>Ответы по уровню роли</h2><p class="hint">Тёмная часть полосы: получили ответ (переписка, интервью, отказ). В подписи: сколько затухли.</p><div id="roles"></div></section>
+  </div>
   <section>
     <h2>Незакрытые вакансии</h2>
     <p class="hint">Новые, к отклику, отложенные по языку и ожидающие ответа.</p>
@@ -227,7 +281,9 @@ const D = JSON.parse(document.getElementById('data').textContent);
 const ALL = 'Все';
 
 document.getElementById('sub').textContent =
-  `Вакансий в учёте: ${D.meta.total}. Обновлено ${D.meta.generated}.` + (D.meta.public ? ' Публичная версия: компании обезличены.' : '');
+  D.meta.public
+    ? `Демонстрационные данные: ${D.meta.total} сгенерированных вакансий, не реальный поиск. Обновлено ${D.meta.generated}.`
+    : `Вакансий в учёте: ${D.meta.total}. Обновлено ${D.meta.generated}.`;
 
 function hbars(sel, items, fmt) {
   const el = d3.select(sel);
@@ -300,7 +356,7 @@ function renderTable() {
   const hr = t.createTHead().insertRow();
   COLS.forEach(([, name]) => { const th = document.createElement('th'); th.textContent = name; hr.appendChild(th); });
   const tb = t.createTBody();
-  rows.forEach(o => { const tr = tb.insertRow(); COLS.forEach(([k]) => { tr.insertCell().textContent = o[k] || ''; }); });
+  rows.forEach(o => { const tr = tb.insertRow(); COLS.forEach(([k]) => { const td = tr.insertCell(); td.className = 'c-' + k; td.textContent = o[k] || ''; }); });
   box.appendChild(t);
 }
 renderTable();

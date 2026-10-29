@@ -107,3 +107,16 @@ def test_empty_registry(tmp_path):
     out = tmp_path / "x.html"
     _build_dashboard([], True, out)
     assert out.exists()
+
+
+def test_demo_rows_give_a_full_funnel():
+    rows = dashboard.demo_rows(today=dashboard.date(2026, 10, 29))
+    assert rows == dashboard.demo_rows(today=dashboard.date(2026, 10, 29))  # deterministic
+    f = counts(dashboard.build_data(rows, public=True))
+    assert f == sorted(f, reverse=True)  # every stage is at most the previous one
+    assert f[-1] >= 1  # at least one offer
+
+
+def test_offer_counts_in_all_later_stages():
+    d = dashboard.build_data([row(Статус="оффер")], public=False)
+    assert counts(d) == [1, 1, 1, 1, 1, 1, 1]

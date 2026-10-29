@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Воронка поиска работы</title>
+<style>
+:root { --bg:#fafaf8; --fg:#1f2328; --muted:#6b7280; --card:#fff; --line:#e5e7eb; --bar:#3b6ea5; --bar2:#9db8d6; --warn:#c2603a; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#16181d; --fg:#e6e8eb; --muted:#9aa3ad; --card:#1e2128; --line:#2f343d; --bar:#6aa0d8; --bar2:#3d5775; --warn:#e08a63; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:1440px; margin:0 auto; padding:24px 16px 48px; }
+.grid { display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:16px; }
+.grid section { margin-bottom:0; }
+@media (min-width:1000px) { .grid { grid-template-columns:1fr 1fr; } }
+h1 { font-size:24px; margin:0 0 4px; }
+.sub { color:var(--muted); margin:0 0 24px; }
+section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+h2 { font-size:16px; margin:0 0 4px; }
+.hint { color:var(--muted); font-size:13px; margin:0 0 12px; }
+svg { width:100%; height:auto; display:block; font-size:13px; }
+svg text { fill:var(--fg); }
+svg .muted, .axis text { fill:var(--muted); }
+.axis path, .axis line { stroke:var(--line); }
+.bar { fill:var(--bar); }
+.bar2 { fill:var(--bar2); }
+.warn { fill:var(--warn); }
+.filters { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.filters label { font-size:13px; color:var(--muted); }
+select { margin-left:6px; padding:4px 6px; background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; }
+.wrap { overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { color:var(--muted); font-weight:600; white-space:nowrap; }
+td.c-date, td.c-tier, td.c-lang, td.c-match, td.c-status { white-space:nowrap; }
+td.c-company, td.c-position, td.c-location { min-width:110px; max-width:190px; }
+td.c-note { width:100%; min-width:280px; }
+.empty { color:var(--muted); padding:12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Воронка поиска работы</h1>
+  <p class="sub" id="sub"></p>
+  <div class="grid">
+  <section><h2>Воронка</h2><p class="hint">Доля считается от всех разобранных вакансий.</p><div id="funnel"></div></section>
+  <section><h2>Статусы</h2><div id="status"></div></section>
+  <section><h2>Вакансии по неделям</h2><p class="hint">Неделя начинается с понедельника.</p><div id="weekly"></div></section>
+  <section><h2>Ответы по уровню роли</h2><p class="hint">Тёмная часть полосы: получили ответ (переписка, интервью, отказ, оффер). В подписи: сколько затухли.</p><div id="roles"></div></section>
+  <section><h2>Язык в отсеве</h2><p class="hint">Требование к языку у вакансий, отсеянных до отклика.</p><div id="lang"></div></section>
+  </div>
+  <section>
+    <h2>Незакрытые вакансии</h2>
+    <p class="hint">Новые, к отклику, отложенные по языку и ожидающие ответа.</p>
+    <div class="filters">
+      <label>Статус <select id="f-status"></select></label>
+      <label>Неделя <select id="f-week"></select></label>
+    </div>
+    <div class="wrap" id="table"></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+<script type="application/json" id="data">{"meta": {"public": true, "total": 140, "generated": "29.10.2026"}, "funnel": [{"label": "Вакансий разобрано", "count": 140}, {"label": "Прошли отсев", "count": 88}, {"label": "Откликов отправлено", "count": 70}, {"label": "Получили ответ", "count": 36}, {"label": "Диалог или интервью", "count": 14}, {"label": "Интервью", "count": 9}, {"label": "Оффер", "count": 2}], "status": [{"label": "Отсеяна до отклика", "count": 52}, {"label": "Отказ", "count": 22}, {"label": "Затухла", "count": 18}, {"label": "Откликнулся", "count": 16}, {"label": "Новая", "count": 9}, {"label": "Интервью", "count": 7}, {"label": "К отклику", "count": 6}, {"label": "В переписке", "count": 5}, {"label": "Отложена по языку", "count": 3}, {"label": "Оффер", "count": 2}], "weekly": [{"label": "20.07", "week": "2026-07-20", "count": 2}, {"label": "27.07", "week": "2026-07-27", "count": 5}, {"label": "03.08", "week": "2026-08-03", "count": 3}, {"label": "10.08", "week": "2026-08-10", "count": 6}, {"label": "17.08", "week": "2026-08-17", "count": 5}, {"label": "24.08", "week": "2026-08-24", "count": 5}, {"label": "31.08", "week": "2026-08-31", "count": 6}, {"label": "07.09", "week": "2026-09-07", "count": 8}, {"label": "14.09", "week": "2026-09-14", "count": 15}, {"label": "21.09", "week": "2026-09-21", "count": 10}, {"label": "28.09", "week": "2026-09-28", "count": 13}, {"label": "05.10", "week": "2026-10-05", "count": 13}, {"label": "12.10", "week": "2026-10-12", "count": 13}, {"label": "19.10", "week": "2026-10-19", "count": 22}, {"label": "26.10", "week": "2026-10-26", "count": 14}], "lang": [{"label": "Английский", "count": 23}, {"label": "Немецкий обязателен", "count": 11}, {"label": "Язык не указан", "count": 10}, {"label": "Английский, немецкий желателен", "count": 8}], "roles": [{"label": "Project Manager", "total": 45, "responded": 12, "silent": 6}, {"label": "Program Manager", "total": 7, "responded": 0, "silent": 0}, {"label": "Team Lead", "total": 19, "responded": 9, "silent": 1}, {"label": "Application Manager", "total": 12, "responded": 3, "silent": 1}, {"label": "IT Business Partner", "total": 9, "responded": 2, "silent": 1}, {"label": "Architect / Consultant", "total": 13, "responded": 3, "silent": 2}, {"label": "AI", "total": 17, "responded": 3, "silent": 4}, {"label": "Прочее", "total": 18, "responded": 4, "silent": 3}], "open": [{"date": "2026-10-29", "week": "2026-10-26", "tier": "B", "lang": "EN", "level": "Architect / Consultant", "status": "откликнулся", "match": "хороший", "company": "Tier B, NL", "position": "Architect / Consultant", "location": "NL"}, {"date": "2026-10-29", "week": "2026-10-26", "tier": "B", "lang": "EN", "level": "Application Manager", "status": "новая", "match": "хороший", "company": "Tier B, DE", "position": "Application Manager", "location": "DE"}, {"date": "2026-10-29", "week": "2026-10-26", "tier": "B", "lang": "не указан", "level": "Project Manager", "status": "откликнулся", "match": "слабый", "company": "Tier B, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-28", "week": "2026-10-26", "tier": "A", "lang": "EN", "level": "Project Manager", "status": "отложена (язык)", "match": "хороший", "company": "Tier A, NL", "position": "Project Manager", "location": "NL"}, {"date": "2026-10-28", "week": "2026-10-26", "tier": "A", "lang": "не указан", "level": "Team Lead", "status": "откликнулся", "match": "слабый", "company": "Tier A, DE", "position": "Team Lead", "location": "DE"}, {"date": "2026-10-28", "week": "2026-10-26", "tier": "B", "lang": "не указан", "level": "Program Manager", "status": "новая", "match": "средний", "company": "Tier B", "position": "Program Manager", "location": "—"}, {"date": "2026-10-28", "week": "2026-10-26", "tier": "C", "lang": "EN", "level": "Project Manager", "status": "отложена (язык)", "match": "сильный", "company": "Tier C, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-27", "week": "2026-10-26", "tier": "A", "lang": "EN", "level": "Project Manager", "status": "к отклику", "match": "сильный", "company": "Tier A, NL", "position": "Project Manager", "location": "NL"}, {"date": "2026-10-27", "week": "2026-10-26", "tier": "B", "lang": "EN", "level": "Team Lead", "status": "откликнулся", "match": "средний", "company": "Tier B, DE", "position": "Team Lead", "location": "DE"}, {"date": "2026-10-27", "week": "2026-10-26", "tier": "C", "lang": "DE обязателен", "level": "Architect / Consultant", "status": "откликнулся", "match": "сильный", "company": "Tier C, NL", "position": "Architect / Consultant", "location": "NL"}, {"date": "2026-10-26", "week": "2026-10-26", "tier": "C", "lang": "EN", "level": "IT Business Partner", "status": "новая", "match": "слабый", "company": "Tier C, NL", "position": "IT Business Partner", "location": "NL"}, {"date": "2026-10-26", "week": "2026-10-26", "tier": "B", "lang": "EN", "level": "Project Manager", "status": "откликнулся", "match": "слабый", "company": "Tier B, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-26", "week": "2026-10-26", "tier": "A", "lang": "не указан", "level": "Project Manager", "status": "к отклику", "match": "хороший", "company": "Tier A, NL", "position": "Project Manager", "location": "NL"}, {"date": "2026-10-26", "week": "2026-10-26", "tier": "C", "lang": "EN", "level": "AI", "status": "откликнулся", "match": "средний", "company": "Tier C, NL", "position": "AI", "location": "NL"}, {"date": "2026-10-25", "week": "2026-10-19", "tier": "A", "lang": "EN", "level": "Application Manager", "status": "отложена (язык)", "match": "слабый", "company": "Tier A, DE", "position": "Application Manager", "location": "DE"}, {"date": "2026-10-25", "week": "2026-10-19", "tier": "A", "lang": "EN", "level": "Application Manager", "status": "откликнулся", "match": "слабый", "company": "Tier A", "position": "Application Manager", "location": "—"}, {"date": "2026-10-25", "week": "2026-10-19", "tier": "A", "lang": "не указан", "level": "Architect / Consultant", "status": "новая", "match": "сильный", "company": "Tier A, NL", "position": "Architect / Consultant", "location": "NL"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "C", "lang": "EN+DE желателен", "level": "Прочее", "status": "откликнулся", "match": "слабый", "company": "Tier C, NL", "position": "Прочее", "location": "NL"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "A", "lang": "EN", "level": "Project Manager", "status": "новая", "match": "сильный", "company": "Tier A, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "AI", "status": "откликнулся", "match": "средний", "company": "Tier C, DE", "position": "AI", "location": "DE"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "A", "lang": "EN", "level": "AI", "status": "откликнулся", "match": "сильный", "company": "Tier A, DE", "position": "AI", "location": "DE"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "Project Manager", "status": "к отклику", "match": "хороший", "company": "Tier C, NL", "position": "Project Manager", "location": "NL"}, {"date": "2026-10-24", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "Прочее", "status": "откликнулся", "match": "хороший", "company": "Tier C, NL", "position": "Прочее", "location": "NL"}, {"date": "2026-10-23", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "AI", "status": "откликнулся", "match": "хороший", "company": "Tier C, NL", "position": "AI", "location": "NL"}, {"date": "2026-10-23", "week": "2026-10-19", "tier": "B", "lang": "не указан", "level": "Прочее", "status": "новая", "match": "хороший", "company": "Tier B, DE", "position": "Прочее", "location": "DE"}, {"date": "2026-10-23", "week": "2026-10-19", "tier": "C", "lang": "EN+DE желателен", "level": "Project Manager", "status": "откликнулся", "match": "сильный", "company": "Tier C, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-22", "week": "2026-10-19", "tier": "B", "lang": "EN", "level": "Application Manager", "status": "новая", "match": "хороший", "company": "Tier B, DE", "position": "Application Manager", "location": "DE"}, {"date": "2026-10-22", "week": "2026-10-19", "tier": "B", "lang": "EN", "level": "Program Manager", "status": "новая", "match": "хороший", "company": "Tier B, DE", "position": "Program Manager", "location": "DE"}, {"date": "2026-10-21", "week": "2026-10-19", "tier": "B", "lang": "EN", "level": "Project Manager", "status": "новая", "match": "средний", "company": "Tier B, NL", "position": "Project Manager", "location": "NL"}, {"date": "2026-10-21", "week": "2026-10-19", "tier": "B", "lang": "не указан", "level": "Project Manager", "status": "к отклику", "match": "средний", "company": "Tier B, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-21", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "Program Manager", "status": "откликнулся", "match": "средний", "company": "Tier C, DE", "position": "Program Manager", "location": "DE"}, {"date": "2026-10-21", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "Project Manager", "status": "к отклику", "match": "хороший", "company": "Tier C, DE", "position": "Project Manager", "location": "DE"}, {"date": "2026-10-20", "week": "2026-10-19", "tier": "C", "lang": "EN", "level": "IT Business Partner", "status": "к отклику", "match": "средний", "company": "Tier C", "position": "IT Business Partner", "location": "—"}, {"date": "2026-10-19", "week": "2026-10-19", "tier": "A", "lang": "не указан", "level": "Program Manager", "status": "откликнулся", "match": "средний", "company": "Tier A, NL", "position": "Program Manager", "location": "NL"}]}</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const ALL = 'Все';
+
+document.getElementById('sub').textContent =
+  D.meta.public
+    ? `Демонстрационные данные: ${D.meta.total} сгенерированных вакансий, не реальный поиск. Обновлено ${D.meta.generated}.`
+    : `Вакансий в учёте: ${D.meta.total}. Обновлено ${D.meta.generated}.`;
+
+function hbars(sel, items, fmt) {
+  const el = d3.select(sel);
+  if (!items.length) { el.append('p').attr('class', 'empty').text('Нет данных'); return; }
+  const W = 680, row = 30, L = 250, R = 90, H = items.length * row + 4;
+  const svg = el.append('svg').attr('viewBox', `0 0 ${W} ${H}`);
+  const x = d3.scaleLinear([0, d3.max(items, d => d.count) || 1], [0, W - L - R]);
+  const g = svg.selectAll('g').data(items).join('g').attr('transform', (d, i) => `translate(0,${i * row})`);
+  g.append('text').attr('x', L - 8).attr('y', row / 2).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text(d => d.label);
+  g.append('rect').attr('class', 'bar').attr('x', L).attr('y', 4).attr('height', row - 10).attr('rx', 3).attr('width', d => Math.max(x(d.count), 1));
+  g.append('text').attr('x', d => L + Math.max(x(d.count), 1) + 6).attr('y', row / 2).attr('dominant-baseline', 'middle').text(fmt || (d => d.count));
+}
+
+function weekly(sel, items) {
+  const el = d3.select(sel);
+  if (!items.length) { el.append('p').attr('class', 'empty').text('Нет данных'); return; }
+  const W = 640, H = 220, m = {t: 10, r: 10, b: 30, l: 32};
+  const svg = el.append('svg').attr('viewBox', `0 0 ${W} ${H}`);
+  const x = d3.scaleBand(items.map(d => d.label), [m.l, W - m.r]).padding(0.2);
+  const y = d3.scaleLinear([0, d3.max(items, d => d.count) || 1], [H - m.b, m.t]).nice();
+  const step = Math.ceil(items.length / 12);
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).tickValues(x.domain().filter((_, i) => i % step === 0)).tickSizeOuter(0));
+  svg.append('g').attr('class', 'axis').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5));
+  svg.selectAll('rect').data(items).join('rect').attr('class', 'bar')
+    .attr('x', d => x(d.label)).attr('width', x.bandwidth())
+    .attr('y', d => y(d.count)).attr('height', d => y(0) - y(d.count)).attr('rx', 2)
+    .append('title').text(d => `Неделя с ${d.label}: ${d.count}`);
+}
+
+function roles(sel, items) {
+  const el = d3.select(sel);
+  const W = 640, row = 36, L = 210, R = 190, H = items.length * row + 4;
+  const svg = el.append('svg').attr('viewBox', `0 0 ${W} ${H}`);
+  const x = d3.scaleLinear([0, d3.max(items, d => d.total) || 1], [0, W - L - R]);
+  const g = svg.selectAll('g').data(items).join('g').attr('transform', (d, i) => `translate(0,${i * row})`);
+  g.append('text').attr('x', L - 8).attr('y', row / 2).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text(d => d.label);
+  g.append('rect').attr('class', 'bar2').attr('x', L).attr('y', 6).attr('height', row - 14).attr('rx', 3).attr('width', d => Math.max(x(d.total), 1));
+  g.append('rect').attr('class', 'bar').attr('x', L).attr('y', 6).attr('height', row - 14).attr('rx', 3).attr('width', d => x(d.responded));
+  g.append('text').attr('x', d => L + Math.max(x(d.total), 1) + 6).attr('y', row / 2).attr('dominant-baseline', 'middle')
+    .text(d => `${d.responded} из ${d.total}` + (d.total ? ` (${Math.round(100 * d.responded / d.total)}%)` : '') + (d.silent ? `, затухли: ${d.silent}` : ''));
+}
+
+hbars('#funnel', D.funnel, d => `${d.count} (${D.meta.total ? Math.round(100 * d.count / D.meta.total) : 0}%)`);
+hbars('#status', D.status);
+weekly('#weekly', D.weekly);
+hbars('#lang', D.lang);
+roles('#roles', D.roles);
+
+// open vacancies table
+const COLS = D.meta.public
+  ? [['date', 'Дата'], ['company', 'Работодатель'], ['position', 'Роль'], ['location', 'Страна'], ['lang', 'Язык'], ['status', 'Статус'], ['match', 'Матч']]
+  : [['date', 'Дата'], ['company', 'Компания'], ['position', 'Позиция'], ['location', 'Локация'], ['tier', 'Тип'], ['lang', 'Язык'], ['level', 'Уровень'], ['status', 'Статус'], ['match', 'Матч'], ['note', 'Вывод'], ['cv', 'CV']];
+
+function fill(id, values) {
+  const s = document.getElementById(id);
+  [ALL, ...values].forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; s.appendChild(o); });
+  s.addEventListener('change', renderTable);
+}
+fill('f-status', [...new Set(D.open.map(o => o.status))].sort());
+fill('f-week', [...new Set(D.open.map(o => o.week).filter(Boolean))].sort().reverse());
+
+function renderTable() {
+  const fs = document.getElementById('f-status').value, fw = document.getElementById('f-week').value;
+  const rows = D.open.filter(o => (fs === ALL || o.status === fs) && (fw === ALL || o.week === fw));
+  const box = document.getElementById('table');
+  box.textContent = '';
+  if (!rows.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Ничего не найдено'; box.appendChild(p); return; }
+  const t = document.createElement('table');
+  const hr = t.createTHead().insertRow();
+  COLS.forEach(([, name]) => { const th = document.createElement('th'); th.textContent = name; hr.appendChild(th); });
+  const tb = t.createTBody();
+  rows.forEach(o => { const tr = tb.insertRow(); COLS.forEach(([k]) => { const td = tr.insertCell(); td.className = 'c-' + k; td.textContent = o[k] || ''; }); });
+  box.appendChild(t);
+}
+renderTable();
+</script>
+</body>
+</html>

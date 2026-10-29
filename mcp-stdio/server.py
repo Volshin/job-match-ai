@@ -26,7 +26,7 @@ import dashboard
 DATA_DIR = Path(__file__).parent.parent / "data"
 VACANCIES_FILE = DATA_DIR / "vacancies.csv"
 CRITERIA_FILE = DATA_DIR / "criteria.md"
-# The private dashboard stays in data/ (gitignored); only the public one goes to docs/ (GitHub Pages).
+# The private dashboard stays in data/ (gitignored); the public one (demo data only) goes to docs/ (GitHub Pages).
 PRIVATE_DASHBOARD = DATA_DIR / "dashboard.html"
 PUBLIC_DASHBOARD = Path(__file__).parent.parent / "docs" / "index.html"
 
@@ -35,7 +35,8 @@ DICT_STATUS = {"новая", "отклонена", "к отклику", "отк�
 DICT_MATCH  = {"сильный", "хороший", "средний", "слабый"}
 DICT_ETYPE  = {"A", "B", "C"}
 DICT_LANG   = {"EN", "EN+DE желателен", "DE обязателен", "не указан"}
-DICT_LEVEL  = {"Application Manager", "IT Business Partner", "Team Lead", "Project Manager", "Architect / Consultant", "прочее"}
+DICT_LEVEL  = {"Application Manager", "IT Business Partner", "Team Lead", "Project Manager", "Program Manager",
+               "Architect / Consultant", "AI", "прочее"}
 DICT_SOURCE = {"LinkedIn", "Xing", "рекрутер", "сайт компании", "джоб-борд", "прочее"}
 
 # Maps parameter name → (dict, column label)
@@ -629,22 +630,25 @@ def build_dashboard(public: bool = False) -> str:
     Parameters:
         public — False (default): full personal version, written to
                  data/dashboard.html (not tracked by git).
-                 True: anonymised version for GitHub Pages, written to
-                 docs/index.html. Companies become "Tier X, country", positions
-                 become role levels, notes ("Вывод / причина") and CV versions
-                 are dropped.
+                 True: demo version for GitHub Pages, written to
+                 docs/index.html. Built from generated demo data, not from
+                 the registry: the real search never leaves this machine.
 
     The file is a snapshot: data is embedded at build time, so rebuild after
     registry changes.
     """
     out = PUBLIC_DASHBOARD if public else PRIVATE_DASHBOARD
-    return _build_dashboard(_read_rows(), public, out)
+    return _build_dashboard(_dashboard_rows(public), public, out)
+
+
+def _dashboard_rows(public: bool) -> list[dict]:
+    return dashboard.demo_rows() if public else _read_rows()
 
 
 if __name__ == "__main__":
     if sys.argv[1:2] == ["build-dashboard"]:
         # CLI for scripts (publish.sh): server.py build-dashboard [--public]
         _public = "--public" in sys.argv[2:]
-        print(_build_dashboard(_read_rows(), _public, PUBLIC_DASHBOARD if _public else PRIVATE_DASHBOARD))
+        print(_build_dashboard(_dashboard_rows(_public), _public, PUBLIC_DASHBOARD if _public else PRIVATE_DASHBOARD))
     else:
         mcp.run(transport="stdio")
