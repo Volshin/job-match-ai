@@ -17,7 +17,7 @@ vacancies per quarter rather than mass applications.
 
 Claude Desktop (or Claude Code) connects to the server via stdio. You talk
 to Claude; Claude calls the tools; the registry stays on your machine.
-A dashboard is built from the registry on demand.
+A personal dashboard is rebuilt automatically on every registry change.
 
 ```
 Agent (Claude Desktop / Claude Code)
@@ -28,15 +28,16 @@ mcp-stdio/server.py
      ├──▶ data/criteria.md      ← selection criteria (backed up on every edit)
      └──▶ data/vacancies.csv    ← structured registry, 12 columns
                │
-               │  build_dashboard
+               │  rebuilt on every write (or build_dashboard)
                ▼
      data/dashboard.html        ← personal version, stays local
      docs/index.html            ← public demo version → GitHub Pages
 ```
 
 Both dashboard files are single HTML pages with the data embedded at build
-time (charts are drawn by d3, loaded from a CDN). They are snapshots:
-rebuild after the registry changes.
+time (charts are drawn by d3, loaded from a CDN). The personal one is
+refreshed after every write to the registry, so opening the file always shows
+the current state. The public one is static: it does not depend on the registry.
 
 ## Tools
 
@@ -59,19 +60,16 @@ The public version is built from generated demo data, not from the registry:
 the real search never leaves the machine. The page says so in its subtitle.
 
 ```bash
-# from the Claude chat: ask for build_dashboard, or from a terminal:
+# the personal dashboard refreshes itself; to rebuild it by hand,
+# ask Claude for build_dashboard, or from a terminal:
 cd mcp-stdio
 uv run python server.py build-dashboard             # personal → data/dashboard.html
 uv run python server.py build-dashboard --public    # public   → docs/index.html
-
-# build the public version, commit docs/ and push (from main):
-./publish.sh
-./publish.sh --dry-run    # build only
 ```
 
-GitHub Pages: Settings → Pages → Deploy from a branch → `main` / `/docs`.
-`launchd/com.pet9.publish-dashboard.plist` is a ready daily-publish job;
-it is not enabled, see the comments inside for how to turn it on.
+The public page only needs rebuilding when the page design changes: build it
+with `--public`, commit `docs/index.html` and push. GitHub Pages is set to
+deploy `main` / `/docs`.
 
 ## Registry schema
 
@@ -84,14 +82,19 @@ closed-list classifiers validated on write.
 | Компания | free | — |
 | Позиция | free | — |
 | Локация | free | — |
-| Источник | classifier | LinkedIn, Xing, рекрутер, сайт компании, джоб-борд, прочее |
-| Тип работодателя | classifier | A (inhouse), B (inhouse via agency), C (SI / consulting / vendor) |
-| Язык (требование) | classifier | EN, EN+DE желателен, DE обязателен, не указан |
-| Уровень роли | classifier | Application Manager, IT Business Partner, Team Lead, Project Manager, Architect / Consultant, прочее |
-| Статус | classifier | новая, отклонена, к отклику, откликнулся, в переписке, интервью, отказ, затухла |
-| Оценка матча | classifier | сильный, хороший, средний, слабый |
+| Источник | classifier | see `mcp-stdio/dictionaries.json` |
+| Тип работодателя | classifier | see `mcp-stdio/dictionaries.json` (A inhouse, B inhouse via agency, C SI / consulting / vendor) |
+| Язык (требование) | classifier | see `mcp-stdio/dictionaries.json` |
+| Уровень роли | classifier | see `mcp-stdio/dictionaries.json` |
+| Статус | classifier | see `mcp-stdio/dictionaries.json` |
+| Оценка матча | classifier | see `mcp-stdio/dictionaries.json` |
 | Вывод / причина | free | — |
 | Версия CV | free | — |
+
+The allowed values of every classifier live in `mcp-stdio/dictionaries.json`:
+the server validates writes against it, the dashboard reads the role levels
+from it, and `tests/test_dictionaries.py` fails if `criteria.md` or the
+registry drift away from it.
 
 New entries go to the top. Atomic writes (temp file + rename).
 
@@ -143,18 +146,16 @@ MatchJobAIExt9/
 ├── mcp-stdio/          # v2 — active
 │   ├── server.py       # MCP tools
 │   ├── dashboard.py    # dashboard builder
+│   ├── dictionaries.json  # allowed values of the classifier columns
 │   ├── tests/
 │   ├── pyproject.toml
 │   └── uv.lock
 ├── docs/               # GitHub Pages: public dashboard (index.html)
-├── launchd/            # optional daily publish job (disabled)
-├── publish.sh          # build public dashboard + git push
 ├── data/               # working data, not tracked by git
 │   ├── vacancies.csv   → vacancies1209.csv (symlink)
 │   ├── criteria.md     → criteria-v2_1.md  (symlink)
 │   └── dashboard.html  # personal dashboard
-├── extension/          # v1 — archived, not maintained
-└── mcp-server/         # v1 — archived, not maintained
+└── legacy/             # v1 (Chrome extension + Raspberry Pi server) — archived, not maintained
 ```
 
 ## Why v1 was retired
