@@ -120,3 +120,21 @@ def test_demo_rows_give_a_full_funnel():
 def test_offer_counts_in_all_later_stages():
     d = dashboard.build_data([row(Статус="оффер")], public=False)
     assert counts(d) == [1, 1, 1, 1, 1, 1, 1]
+
+
+def test_registry_write_refreshes_personal_dashboard(tmp_path, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(server, "VACANCIES_FILE", tmp_path / "vacancies.csv")
+    monkeypatch.setattr(server, "PRIVATE_DASHBOARD", tmp_path / "dashboard.html")
+    server._write_rows([row(Компания="Fresh Corp")])
+    assert "Fresh Corp" in (tmp_path / "dashboard.html").read_text(encoding="utf-8")
+
+
+def test_dashboard_failure_does_not_break_the_write(tmp_path, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(server, "VACANCIES_FILE", tmp_path / "vacancies.csv")
+    monkeypatch.setattr(server, "_build_dashboard", lambda *a: 1 / 0)
+    server._write_rows([row()])
+    assert (tmp_path / "vacancies.csv").exists()

@@ -21,6 +21,7 @@ import sys
 from fastmcp import FastMCP
 
 import dashboard
+import dictionaries
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -30,14 +31,13 @@ CRITERIA_FILE = DATA_DIR / "criteria.md"
 PRIVATE_DASHBOARD = DATA_DIR / "dashboard.html"
 PUBLIC_DASHBOARD = Path(__file__).parent.parent / "docs" / "index.html"
 
-# ── Closed-list dictionaries (edit here, validation uses these automatically) ──
-DICT_STATUS = {"новая", "отклонена", "к отклику", "откликнулся", "в переписке", "интервью", "отказ", "затухла", "отложена (язык)"}
-DICT_MATCH  = {"сильный", "хороший", "средний", "слабый"}
-DICT_ETYPE  = {"A", "B", "C"}
-DICT_LANG   = {"EN", "EN+DE желателен", "DE обязателен", "не указан"}
-DICT_LEVEL  = {"Application Manager", "IT Business Partner", "Team Lead", "Project Manager", "Program Manager",
-               "Architect / Consultant", "AI", "прочее"}
-DICT_SOURCE = {"LinkedIn", "Xing", "рекрутер", "сайт компании", "джоб-борд", "прочее"}
+# ── Closed-list dictionaries: values live in dictionaries.json, edit them there ──
+DICT_STATUS = set(dictionaries.VALUES["status"])
+DICT_MATCH  = set(dictionaries.VALUES["match_score"])
+DICT_ETYPE  = set(dictionaries.VALUES["employer_type"])
+DICT_LANG   = set(dictionaries.VALUES["language_requirement"])
+DICT_LEVEL  = set(dictionaries.VALUES["role_level"])
+DICT_SOURCE = set(dictionaries.VALUES["source"])
 
 # Maps parameter name → (dict, column label)
 _DICT_MAP = {
@@ -115,6 +115,17 @@ def _write_rows(rows: list[dict]) -> None:
         writer.writeheader()
         writer.writerows(rows)
     tmp.replace(VACANCIES_FILE)  # atomic on POSIX / macOS
+    _refresh_dashboard(rows)
+
+
+def _refresh_dashboard(rows: list[dict]) -> None:
+    """Keep the personal dashboard in step with the registry. A failure here must never fail the write."""
+    if VACANCIES_FILE.parent != DATA_DIR:
+        return
+    try:
+        _build_dashboard(rows, False, PRIVATE_DASHBOARD)
+    except Exception as e:
+        print(f"dashboard was not refreshed: {e}", file=sys.stderr)
 
 
 JOURNAL_HEADING = "## Журнал изменений"

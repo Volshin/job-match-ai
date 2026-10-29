@@ -10,14 +10,16 @@ from collections import Counter
 import html
 import json
 
+import dictionaries
+
 D3_URL = "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
 D3_SRI = "sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"
 
 APPLIED   = ("откликнулся", "в переписке", "интервью", "отказ", "затухла", "оффер")
 REPLIED   = ("в переписке", "интервью", "отказ", "оффер")
 OPEN      = ("новая", "к отклику", "отложена (язык)", "откликнулся")
-LEVELS    = ("Project Manager", "Program Manager", "Team Lead", "Application Manager",
-             "IT Business Partner", "Architect / Consultant", "AI", "Прочее")
+LEVELS    = dictionaries.VALUES["role_level"]
+LEVEL_LABELS = {"прочее": "Прочее"}
 
 STATUS_LABELS = {
     "отклонена": "Отсеяна до отклика", "отказ": "Отказ", "к отклику": "К отклику",
@@ -70,6 +72,12 @@ def country_of(location: str) -> str:
             elif h in low:
                 return code
     return ""
+
+
+def _level_key(level: str) -> str:
+    """Registry level as a LEVELS key, ignoring case; anything unknown counts as 'прочее'."""
+    by_lower = {k.lower(): k for k in LEVELS}
+    return by_lower.get((level or "").strip().lower(), "прочее")
 
 
 def _short(company: str) -> str:
@@ -157,14 +165,13 @@ def build_data(rows: list[dict], public: bool) -> dict:
 
     lv = {k: [0, 0, 0] for k in LEVELS}
     for r in rows:
-        k = r.get("Уровень роли", "")
-        k = k if k in lv else "Прочее"
+        k = _level_key(r.get("Уровень роли", ""))
         lv[k][0] += 1
         if r.get("Статус") in REPLIED:
             lv[k][1] += 1
         if r.get("Статус") == "затухла":
             lv[k][2] += 1
-    roles = [{"label": k, "total": a, "responded": b, "silent": c} for k, (a, b, c) in lv.items()]
+    roles = [{"label": LEVEL_LABELS.get(k, k), "total": a, "responded": b, "silent": c} for k, (a, b, c) in lv.items()]
 
     open_rows = []
     for r in rows:

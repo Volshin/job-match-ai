@@ -1,0 +1,8 @@
+{
+  "status": ["новая", "отклонена", "к отклику", "откликнулся", "в переписке", "интервью", "оффер", "отказ", "затухла", "отложена (язык)"],
+  "match_score": ["сильный", "хороший", "средний", "слабый"],
+  "employer_type": ["A", "B", "C"],
+  "language_requirement": ["EN", "EN+DE желателен", "EN+NL желателен", "DE обязателен", "NL обязателен", "DK обязателен", "не указан"],
+  "role_level": ["Project Manager", "Program Manager", "Team Lead", "Application Manager", "IT Business Partner", "Architect / Consultant", "AI", "прочее"],
+  "source": ["LinkedIn", "Xing", "рекрутер", "сайт компании", "джоб-борд", "прочее"]
+}
